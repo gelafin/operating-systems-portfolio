@@ -9,9 +9,11 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
+    // test basic i/o
+    printf("testing 3 inputs");
     char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
 
-    for (int index = 0; index < 4; index++) {
+    for (int index = 0; index < 3; index++) {
         printCommandPrompt();
         scanf("%s", userInput);
         printf("you entered %s\n", userInput);

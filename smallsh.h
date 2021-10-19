@@ -21,7 +21,7 @@ struct CommandLine {
 
 void printCommandPrompt();
 void printToTerminal(const char*);
-void parseInput(char*, struct CommandLine*);
+struct CommandLine* parseCommandString(char*);
 
 
 /*
@@ -52,12 +52,44 @@ void printToTerminal(const char* text) {
 
 
 /*
-* reads a line from the prompt and save parsed input in the given struct
+* reads a line from the prompt and saves parsed input to the given struct
+* command syntax is
+*       command [arg1 arg2 ...] [< input_file] [> output_file] [&]
+*   where square-bracketed items are optional. Note that special characters
+*   must still be surrounded by spaces. 
+*   The < redirects input and the > redirects output.
+*   Input redirection can appear before or after output redirection.
+*   The & is only special as the last character,
+*   where it means "run command in the background"
+*   Any instance of $$ is expanded into the smallsh process id
 * inputString: one line of unprocessed user input
-* commandLine: pointer to a CommandLine struct where parsed results will be saved
+* return: pointer to a CommandLine struct where parsed results will be saved
 */
-void parseInput(char* inputString, struct CommandLine* commandLine) {
-    //
+struct CommandLine* parseCommandString(char* stringInput) {
+    char* indexPointer;
+    char* inputToken;
+    const char* delimiter = " ";
+    struct CommandLine* commandLine;
+
+    // process first token now to check for empty input
+    char* inputToken = strtok_r(stringInput, delimiter, &indexPointer);
+
+    // break string into tokens
+    while (inputToken != NULL) {
+        // handle command
+
+        // handle args
+
+        // handle input redirection
+
+        // handle output redirection
+
+        // handle isBackground preference
+
+        // try to extract another token in case there are more
+        char* inputToken = strtok_r(stringInput, delimiter, &indexPointer);
+    }
+    
 
     return;
 }
