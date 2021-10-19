@@ -26,6 +26,17 @@ struct CommandLine* parseCommandString(char*);
 
 
 /*
+* Wrapper for strcmp
+* string1: any string
+* string2: any string
+* return: true if string1 is equal to string2; false if not
+*/
+bool isEqualString(char* string1, char* string2) {
+    return strcmp(string1, string2) == 0;
+}
+
+
+/*
 * prints the special command prompt string to the terminal
 */
 void printCommandPrompt() {
@@ -47,18 +58,6 @@ void printToTerminal(const char* text) {
 
     // flush output buffer (output text may not reach the screen until this happens)
     fflush(NULL);
-
-    return;
-}
-
-/*
-* copies a source string to a destination string, dynamically allocating memory as needed
-* destination: string to overwrite
-* source: string to copy
-*/
-void strcpyDynamic(char* destination, char* source) {
-    destination = calloc(strlen(source) + 1, sizeof(char));
-    strcpy(destination, source);
 
     return;
 }
@@ -184,4 +183,20 @@ struct CommandLine* parseCommandString(char* stringInput) {
     
     // return a pointer to the struct which now has all the parsed data in it
     return commandLine;
+}
+
+
+/*
+* executes a command given to smallsh
+* commandLine: pointer to a CommandLine struct which has the command line's details
+*/
+void executeCommand(struct CommandLine* commandLine) {
+    const char commentChar = '#';
+
+    // ignore comment lines
+    if (commandLine->command[0] == commentChar) {
+        // ignore this whole line; it's a comment
+    }
+
+    return;
 }

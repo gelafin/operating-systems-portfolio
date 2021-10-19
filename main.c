@@ -12,14 +12,16 @@
 */
 int main(int argc, char* argv[]) {
     // test basic i/o
-    printf("testing input\n");
+    printf("\tDEBUG: testing input\n");
     char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
 
     for (int index = 0; index < 3; index++) {
         printCommandPrompt();
         fgets(userInput, MAX_INPUT_LENGTH + 1, stdin);
-        printf("DEBUG: Your raw command is %s\n", userInput);
-        parseCommandString(userInput);
+        printf("\tDEBUG: Your raw command is %s\n", userInput);
+        struct CommandLine* commandLine = parseCommandString(userInput);
+        printf("\tDEBUG: handling command %s...\n", commandLine->command);
+        executeCommand(commandLine);
     }
 
     return EXIT_SUCCESS;
