@@ -9,7 +9,13 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    
+    char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
+
+    for (int index = 0; index < 4; index++) {
+        printCommandPrompt();
+        scanf("%s", userInput);
+        printf("you entered %s\n", userInput);
+    }
 
     return EXIT_SUCCESS;
 }
