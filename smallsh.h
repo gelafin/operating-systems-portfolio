@@ -82,7 +82,7 @@ void strcpyDynamic(char* destination, char* source) {
 struct CommandLine* parseCommandString(char* stringInput) {
     char* indexPointer;
     char* inputToken;
-    char* delimiter = " ";
+    char* delimiter = " \n";  // need to add \n because fgets appends it
     char inputRedirectChar = '<';
     char outputRedirectChar = '>';
     char backgroundChar = '&';
@@ -98,7 +98,7 @@ struct CommandLine* parseCommandString(char* stringInput) {
     commandLine->argCount = 0;
     commandLine->isBackground = false;
 
-    // example commands
+    // example commands for testing
     // command arg
     // command arg arg
     // command < filename
@@ -112,9 +112,15 @@ struct CommandLine* parseCommandString(char* stringInput) {
     // It is the first that shows whether input is empty, and
     // it is the only non-optional token
     inputToken = strtok_r(stringInput, delimiter, &indexPointer);
+
     if (inputToken != NULL) {
-        strcpyDynamic(commandLine->command, inputToken);
+        // strcpyDynamic(commandLine->command, inputToken);
+        commandLine->command = calloc(strlen(inputToken) + 1, sizeof(char));
+        strcpy(commandLine->command, inputToken);
     }
+
+    // try to extract another token in case there are args or options
+    inputToken = strtok_r(NULL, delimiter, &indexPointer);
 
     // handle remaining tokens in the command string
     while (inputToken != NULL) {
@@ -136,7 +142,7 @@ struct CommandLine* parseCommandString(char* stringInput) {
             // next token will be output file name
             isOutFileName = true;
             isSpecialChar = true;
-        } else if (inputToken[0] ==backgroundChar) {
+        } else if (inputToken[0] == backgroundChar) {
             // handle isBackground preference
             commandLine->isBackground = true;
             isSpecialChar = true;
@@ -149,27 +155,31 @@ struct CommandLine* parseCommandString(char* stringInput) {
         }
 
         // check flags that depend on special characters
-        if (isInFileName) {
+        if (isInFileName && !isSpecialChar) {
             // this is the name of the input file. Save it
-            strcpyDynamic(commandLine->inFile, inputToken);
+            commandLine->inFile = calloc(strlen(inputToken) + 1, sizeof(char));
+            strcpy(commandLine->inFile, inputToken);
 
             // make sure the next token isn't treated as the input file name!
             isInFileName = false;
-        } else if (isOutFileName) {
+        } else if (isOutFileName && !isSpecialChar) {
             // this is the name of the output file. Save it
-            strcpyDynamic(commandLine->outFile, inputToken);
+            commandLine->outFile = calloc(strlen(inputToken) + 1, sizeof(char));
+            strcpy(commandLine->outFile, inputToken);
 
             // make sure the next token isn't treated as the output file name!
             isOutFileName = false;
         } else if (!argsAreDone) {
             // this token is an arg. Add it to the array of args 
             // and increment the arg count so the next arg is added at the end
-            strcpyDynamic(commandLine->args[commandLine->argCount], inputToken);
+            commandLine->args[commandLine->argCount] = calloc(strlen(inputToken) + 1, sizeof(char));
+            strcpy(commandLine->args[commandLine->argCount], inputToken);
+
             ++commandLine->argCount;
         }
 
         // try to extract another token in case there are more
-        inputToken = strtok_r(stringInput, delimiter, &indexPointer);
+        inputToken = strtok_r(NULL, delimiter, &indexPointer);
     }
     
     // return a pointer to the struct which now has all the parsed data in it
