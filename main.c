@@ -22,6 +22,9 @@ int main(int argc, char* argv[]) {
         struct CommandLine* commandLine = parseCommandString(userInput);
         printf("\tDEBUG: handling command %s...\n", commandLine->command);
         executeCommand(commandLine);
+
+        // clean up placeholder (memory leaks allowed at this point in class)
+        free(commandLine);
     }
 
     return EXIT_SUCCESS;

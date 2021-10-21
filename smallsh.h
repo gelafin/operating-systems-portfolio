@@ -4,10 +4,12 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 
 #define MAX_INPUT_LENGTH 2048  // defined in specs
 #define MAX_ARG_COUNT 512  // defined in specs
+#define MAX_FILEPATH_LENGTH 32767  // source: https://superuser.com/questions/14883/what-is-the-longest-file-path-that-windows-can-handle
 
 
 struct CommandLine {
@@ -187,6 +189,33 @@ struct CommandLine* parseCommandString(char* stringInput) {
 
 
 /*
+* prints the items in the current directory
+* commandLine: pointer to a CommandLine struct which has the command line's details
+*/
+void handleCdCommand(struct CommandLine* commandLine) {
+    // get the current directory's path
+    char* currentPath = calloc(MAX_FILEPATH_LENGTH, sizeof(char));
+    getcwd(currentPath, MAX_FILEPATH_LENGTH);
+    printf("\tDEBUG: changing directory\n\t\tDEBUG: directory before change: %s\n", currentPath);
+
+    // construct the new directory's path by appending "/" and the input path
+    char* newPath = calloc(MAX_FILEPATH_LENGTH, sizeof(char));
+    strcpy(newPath, currentPath);
+    strcat(newPath, "/");
+    strcat(newPath, commandLine->args[0]);
+
+    // change the current directory to the new path
+    chdir(newPath);
+
+    // DEBUG
+    getcwd(currentPath, MAX_FILEPATH_LENGTH);
+    printf("\t\tDEBUG: directory after change: %s\n", currentPath);
+
+    return;
+}
+
+
+/*
 * executes a command given to smallsh
 * commandLine: pointer to a CommandLine struct which has the command line's details
 */
@@ -196,6 +225,9 @@ void executeCommand(struct CommandLine* commandLine) {
     // ignore comment lines
     if (commandLine->command[0] == commentChar) {
         // ignore this whole line; it's a comment
+    } else if (isEqualString(commandLine->command, "cd")) {
+        // execute the cd command
+        handleCdCommand(commandLine);
     }
 
     return;
