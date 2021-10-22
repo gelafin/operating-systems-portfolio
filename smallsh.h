@@ -24,7 +24,7 @@ struct CommandLine {
 
 
 void printCommandPrompt();
-void printToTerminal(const char*);
+void printToTerminal(const char*, bool);
 struct CommandLine* parseCommandString(char*);
 
 
@@ -56,7 +56,7 @@ bool isPrefix(char* prefix, char* string) {
 */
 void printCommandPrompt() {
     char* commandPromptText = ": ";
-    printToTerminal(commandPromptText);
+    printToTerminal(commandPromptText, false);
 
     return;
 }
@@ -66,10 +66,16 @@ void printCommandPrompt() {
 * prints any given string to the terminal, followed by a newline
 * flushes the output buffer
 * text: one line to print
+* isError: if true, prints with perror() instead of printf()
 */
-void printToTerminal(const char* text) {
-    // print text to terminal
-    printf("%s", text);
+void printToTerminal(const char* text, bool isError) {
+    if (isError) {
+        // print error to standard error
+        perror(text);
+    } else {
+        // print normal text to terminal
+        printf("%s", text);
+    }
 
     // flush output buffer (output text may not reach the screen until this happens)
     fflush(NULL);
@@ -231,8 +237,8 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
     switch (spawnPid) {
         case -1:
             // fork() failed to create a child process
-            perror("fork() failed!\n");
-			exit(EXIT_FAILURE);
+			printToTerminal("fork() failed to create a child process\n", true);
+            exit(EXIT_FAILURE);
             break;
         
         case 0:
@@ -265,7 +271,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
             // This code will only be executed if exec returns to 
             // the original child process because of an error
-            perror("execv");
+            printToTerminal("error in execvp call of child process\n", true);
             exit(EXIT_FAILURE + 1);  // the child process must exit on failure as well
             break;
         
