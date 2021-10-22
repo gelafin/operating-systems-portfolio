@@ -201,44 +201,12 @@ struct CommandLine* parseCommandString(char* stringInput) {
 
 
 /*
-* prints the items in the current directory
+* changes the current directory, supporting relative and absolute paths
 * commandLine: pointer to a CommandLine struct which has the command line's details
 */
 void handleCdCommand(struct CommandLine* commandLine) {
-    char* dirSeparator = "/";
-    char* currentPath = calloc(MAX_FILEPATH_LENGTH, sizeof(char));
-    char* currentPathCopy = calloc(MAX_FILEPATH_LENGTH, sizeof(char));  // this can be destroyed by strtok()
-    char* newPath = calloc(MAX_FILEPATH_LENGTH, sizeof(char));
-    char* rootDirectory = "/";
-
-    // get the current directory's path, and make a copy for strtok()
-    getcwd(currentPath, MAX_FILEPATH_LENGTH);
-    strcpy(currentPathCopy, currentPath);
-    printf("\tDEBUG: changing directory\n\t\tDEBUG: directory before change: %s\n", currentPath);
-
-    // check for the special "go to parent directory" command
-    // handle relative path cd into parent directory
-
-    // check if this is an absolute or relative path
-    // a given path is absolute if it starts with the root directory
-    if (isPrefix(rootDirectory, commandLine->args[0])) {
-        // handle absolute path cd
-        strcpy(newPath, commandLine->args[0]);
-    } else {
-        // Handle relative path cd into child directory.
-        // Construct the new directory's path by 
-        // appending the directory separator and the input path
-        strcpy(newPath, currentPath);
-        strcat(newPath, dirSeparator);
-        strcat(newPath, commandLine->args[0]);
-    }
-
     // change the current directory to the new path
-    chdir(newPath);
-
-    // DEBUG
-    getcwd(currentPath, MAX_FILEPATH_LENGTH);
-    printf("\t\tDEBUG: directory after change: %s\n", currentPath);
+    chdir(commandLine->args[0]);
 
     return;
 }
