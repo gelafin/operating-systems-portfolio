@@ -213,6 +213,17 @@ void handleCdCommand(struct CommandLine* commandLine) {
 
 
 /*
+* kills processes or jobs started by smallsh and terminates smallsh
+*/
+void handleExitCommand() {
+    // kill processes or jobs started by smallsh
+
+    // terminate smallsh
+    exit(EXIT_SUCCESS);
+}
+
+
+/*
 * executes a command given to smallsh
 * commandLine: pointer to a CommandLine struct which has the command line's details
 */
@@ -225,6 +236,9 @@ void executeCommand(struct CommandLine* commandLine) {
     } else if (isEqualString(commandLine->command, "cd")) {
         // execute the cd command
         handleCdCommand(commandLine);
+    } else if (isEqualString(commandLine->command, "exit")) {
+        // execute the exit command
+        handleExitCommand();
     }
 
     return;
