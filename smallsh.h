@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 
 #define MAX_INPUT_LENGTH 2048  // defined in specs
@@ -111,16 +112,6 @@ struct CommandLine* parseCommandString(char* stringInput) {
     commandLine->argCount = 0;
     commandLine->isBackground = false;
 
-    // example commands for testing
-    // command arg
-    // command arg arg
-    // command < filename
-    // command arg arg < filename
-    // command &
-    // command arg > filename
-    // command arg arg > filename &
-    // command arg < filename > filename &
-
     // Process first token now, because it's unique.
     // It is the first that shows whether input is empty, and
     // it is the only non-optional token
@@ -224,6 +215,72 @@ void handleExitCommand() {
 
 
 /*
+* executes a command not directly supported by smallsh
+* (source: adapted from lecture material)
+* commandLine: pointer to a CommandLine struct which has the command line's details
+*/
+void handleThirdPartyCommand(struct CommandLine* commandLine) {
+    pid_t spawnPid = -5;
+    int childStatus;
+    char* childArgv[MAX_ARG_COUNT];  // must use char*[] for execvp() to work with args
+    int copyIndex = 0;  // used by the loop that copies args into childArgv
+
+    // fork off a child process
+    spawnPid = fork();
+
+    switch (spawnPid) {
+        case -1:
+            // fork() failed to create a child process
+            perror("fork() failed!\n");
+			exit(EXIT_FAILURE);
+            break;
+        
+        case 0:
+            // Only the child process will execute this, because its spawnPid is 0
+
+            /* 
+            Prepare a vector of args for execvp 
+            */
+
+            // execvp needs the first arg to be the command filename
+            childArgv[0] = commandLine->command;
+
+            // copy the args provided by user
+            while (copyIndex < commandLine->argCount) {
+                childArgv[copyIndex + 1] = commandLine->args[copyIndex];
+                ++copyIndex;
+            }
+
+            // execvp needs these args to be terminated by a NULL pointer
+            childArgv[copyIndex + 1] = NULL;
+           
+            /* 
+            Execute the third-party command here in this child process 
+            */
+
+            // (use the PATH variable to look for non-built in commands, 
+            // and allow shell scripts to be executed)
+            // In case of success, the new program will terminate the process
+            execvp(childArgv[0], childArgv);
+
+            // This code will only be executed if exec returns to 
+            // the original child process because of an error
+            perror("execv");
+            exit(EXIT_FAILURE + 1);  // the child process must exit on failure as well
+            break;
+        
+        default:
+            // Only the parent process (smallsh) will execute this. Its spawnPid is the child's process ID
+            // Wait for child to finish
+            spawnPid = waitpid(spawnPid, &childStatus, 0);
+            break;
+    }
+
+    return;
+}
+
+
+/*
 * executes a command given to smallsh
 * commandLine: pointer to a CommandLine struct which has the command line's details
 */
@@ -239,6 +296,12 @@ void executeCommand(struct CommandLine* commandLine) {
     } else if (isEqualString(commandLine->command, "exit")) {
         // execute the exit command
         handleExitCommand();
+    } else if (isEqualString(commandLine->command, "status")) {
+        // execute the status command
+        printf("status coming soon\n");
+    } else {
+        // execute a third-party command
+        handleThirdPartyCommand(commandLine);
     }
 
     return;
