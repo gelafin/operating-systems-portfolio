@@ -271,8 +271,11 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
         
         default:
             // Only the parent process (smallsh) will execute this. Its spawnPid is the child's process ID
-            // Wait for child to finish
-            spawnPid = waitpid(spawnPid, &childStatus, 0);
+            if (!commandLine->isBackground) {
+                // Wait for child to finish
+                spawnPid = waitpid(spawnPid, &childStatus, 0);
+            }  // else, skip the wait and create a zombie process (reaped in signal handler)
+
             break;
     }
 
