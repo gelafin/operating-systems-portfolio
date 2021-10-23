@@ -233,7 +233,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
     int copyIndex = 0;  // used by the loop that copies args into childArgv
     char* backgroundNoticePrefix = "background pid is ";
     char* childPidString = calloc(10, sizeof(char));  // room for 10 digits
-    char* backgroundNotice = calloc(strlen(backgroundNoticePrefix), sizeof(char));
+    char* backgroundNotice = calloc(strlen(backgroundNoticePrefix) + 10, sizeof(char));  // room for 10 digits
 
     // fork off a child process
     spawnPid = fork();
@@ -289,6 +289,9 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
                 // convert number to string
                 sprintf(childPidString, "%d", spawnPid);
+
+                // compose and print notice of background process
+                strcat(backgroundNotice, backgroundNoticePrefix);
                 strcat(backgroundNotice, childPidString);
                 strcat(backgroundNotice, "\n");
                 printToTerminal(backgroundNotice, false);
