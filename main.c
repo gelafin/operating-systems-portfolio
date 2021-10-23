@@ -11,17 +11,14 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
-
     while (true) {
         setSIGCHLDhandler();
 
         printCommandPrompt();
 
-        fgets(userInput, MAX_INPUT_LENGTH + 1, stdin);
-        // printf("\tDEBUG: Your raw command is %s\n", userInput);
-        struct CommandLine* commandLine = parseCommandString(userInput);
+        struct CommandLine* commandLine = parseCommandString(getUserCommandString());
         // printf("\tDEBUG: handling command %s...\n", commandLine->command);
+
         executeCommand(commandLine);
 
         // clean up placeholder (memory leaks allowed at this point in class)

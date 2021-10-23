@@ -198,6 +198,84 @@ struct CommandLine* parseCommandString(char* stringInput) {
 }
 
 
+
+/*
+* Returns the pid of smallsh as a string
+*/
+char* getPidString() {
+    char* pidString = calloc(10 + 1, sizeof(char));  // allows 10 digits
+    pid_t pid = getpid();
+
+    // convert to string
+    sprintf(pidString, "%d", pid);
+
+    return pidString;
+}
+
+
+/*
+* Replaces all instances of the pid variable ($$) in stringIn with the smallsh pid
+* stringIn: string which may contain instances of "$$"
+* return: the input string with instances of "$$" replaced by the smallsh pid
+*/
+char* expandPidVariable(char* stringIn) {
+    char* pidVariable = "$$";
+    char* pidString = getPidString();
+    char* stringOut = calloc(strlen(stringIn) + 1, sizeof(char));
+    char* stringTemp = calloc(strlen(stringIn) + 1, sizeof(char));
+    int newLength = 0;
+    int originalLength = strlen(stringIn);
+    char* tokenPointer;
+    char* token = strtok_r(stringIn, pidVariable, &tokenPointer);
+
+    if (strlen(token) == originalLength) {
+        // there are no occurrences of the pid variable
+        strcpy(stringOut, stringIn);
+    } else {
+        // There are some occurrences of the pid variable.
+        // Continue to copy segments of stringIn while substituting
+        // the smallsh pid for the variable
+        while (token != NULL) {
+            // copy the string up to this point
+            strcpy(stringTemp, stringOut);
+
+            // Resize stringOut to fit another pid
+            // Make space for stringTemp + this token + pid
+            free(stringOut);  // stringOut was copied to stringTemp
+            newLength = strlen(stringTemp) + strlen(token) + strlen(pidString) + 1;
+            stringOut = calloc(newLength, sizeof(char));
+            stringTemp = calloc(newLength, sizeof(char));  // for next iteration
+
+            // restore stringOut from before this iteration, and append this token + pid
+            strcpy(stringOut, stringTemp);
+            strcat(stringOut, token);
+            strcat(stringOut, pidString);  // TODO: don't do this for the last iteration
+            free(stringTemp);
+
+            // try to extract another token
+            token = strtok_r(NULL, pidVariable, &tokenPointer);
+        }
+    }
+
+    return stringOut;
+}
+
+
+/*
+* gets a new command from the user
+* return: user input, expanded with smallsh pid in place of $$
+*/
+char* getUserCommandString() {
+    char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
+
+    // get raw string from user
+    fgets(userInput, MAX_INPUT_LENGTH + 1, stdin);
+
+    // return input, expanded with smallsh pid in place of $$
+    return expandPidVariable(userInput);
+}
+
+
 /*
 * changes the current directory, supporting relative and absolute paths
 * commandLine: pointer to a CommandLine struct which has the command line's details
