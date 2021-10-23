@@ -309,7 +309,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 void handleSIGCHLD(int signalNumber) {
     pid_t childPid;
     char* childPidString = calloc(10, sizeof(char));  // space for 10 digits
-    int* terminationStatus = NULL;
+    int* terminationStatus = malloc(sizeof(int));
     char* terminationStatusString = calloc(10, sizeof(char));  // space for 10 digits
     char* notice = calloc(255, sizeof(char));
 

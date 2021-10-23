@@ -14,7 +14,10 @@ int main(int argc, char* argv[]) {
     char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
 
     while (true) {
+        setSIGCHLDhandler();
+
         printCommandPrompt();
+
         fgets(userInput, MAX_INPUT_LENGTH + 1, stdin);
         // printf("\tDEBUG: Your raw command is %s\n", userInput);
         struct CommandLine* commandLine = parseCommandString(userInput);
