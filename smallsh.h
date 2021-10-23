@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 
 #define MAX_INPUT_LENGTH 2048  // defined in specs
@@ -230,6 +231,9 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
     int childStatus;
     char* childArgv[MAX_ARG_COUNT];  // must use char*[] for execvp() to work with args
     int copyIndex = 0;  // used by the loop that copies args into childArgv
+    char* backgroundNoticePrefix = "background pid is ";
+    char* childPidString = calloc(10, sizeof(char));  // room for 10 digits
+    char* backgroundNotice = calloc(strlen(backgroundNoticePrefix), sizeof(char));
 
     // fork off a child process
     spawnPid = fork();
@@ -280,10 +284,76 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             if (!commandLine->isBackground) {
                 // Wait for child to finish
                 spawnPid = waitpid(spawnPid, &childStatus, 0);
-            }  // else, skip the wait and create a zombie process (reaped in signal handler)
+            } else {
+                // skip the wait and let the child become a zombie process (reaped in SIGCHLD handler)
+
+                // convert number to string
+                sprintf(childPidString, "%d", spawnPid);
+                strcat(backgroundNotice, childPidString);
+                strcat(backgroundNotice, "\n");
+                printToTerminal(backgroundNotice, false);
+            }
 
             break;
     }
+
+    return;
+}
+
+
+/*
+* handles a SIGCHLD signal (when a child process of smallsh terminates/stops/resumes)
+* (source: https://stackoverflow.com/a/1512327/14257952)
+* signalNumber: used by sigaction() internally
+*/
+void handleSIGCHLD(int signalNumber) {
+    pid_t childPid;
+    char* childPidString = calloc(10, sizeof(char));  // space for 10 digits
+    int* terminationStatus = NULL;
+    char* terminationStatusString = calloc(10, sizeof(char));  // space for 10 digits
+    char* notice = calloc(255, sizeof(char));
+
+    // reap zombie, collecting info about it
+    childPid = wait(terminationStatus);
+
+    // convert numbers to strings
+    sprintf(childPidString, "%d", childPid);
+    sprintf(terminationStatusString, "%d", *terminationStatus);
+
+    // construct notice to sent to terminal
+    strcpy(notice, "Process ");
+    strcat(notice, childPidString);
+    strcat(notice, " terminated by signal ");
+    strcat(notice, terminationStatusString);
+    strcat(notice, "\n");
+
+    // Notify the user of the process result,
+    // without using strlen(), which is not reentrant
+    write(STDOUT_FILENO, notice, 255);
+
+    return;
+}
+
+
+/*
+* does setup to enable handleSIGCHLD to catch SIGCHLD signals
+* (adapted from lecture material)
+*/
+void setSIGCHLDhandler() {
+    // initialize empty sigaction
+    struct sigaction SIGCHLDaction = {{0}};  // gcc bug: https://stackoverflow.com/a/13758286/14257952
+
+    // register handler function
+    SIGCHLDaction.sa_handler = handleSIGCHLD;
+
+    // block all catchable signals while handle_SIGINT is running
+	sigfillset(&SIGCHLDaction.sa_mask);
+
+    // make no flags set
+	SIGCHLDaction.sa_flags = 0;
+
+    // install the handler to associate the handler with the signal
+    sigaction(SIGCHLD, &SIGCHLDaction, NULL);
 
     return;
 }
@@ -307,7 +377,7 @@ void executeCommand(struct CommandLine* commandLine) {
         handleExitCommand();
     } else if (isEqualString(commandLine->command, "status")) {
         // execute the status command
-        printf("status coming soon\n");
+        printToTerminal("status coming soon\n", false);
     } else {
         // execute a third-party command
         handleThirdPartyCommand(commandLine);
