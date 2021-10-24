@@ -88,6 +88,7 @@ void printToTerminal(const char* text, bool isError) {
 /*
 * reads a line from the prompt and saves parsed input to the given struct
 * does not check for syntax errors (per specs)
+* does not support quoting, so arguments with spaces are not possible (per specs)
 * command syntax is
 *       command [arg1 arg2 ...] [< input_file] [> output_file] [&]
 *   where square-bracketed items are optional. Note that special characters
@@ -215,29 +216,39 @@ char* getPidString() {
 
 /*
 * Imitates strtok() but uses a string delimiter
-* (copied from https://stackoverflow.com/a/29848367/14257952)
+* (adapted from https://stackoverflow.com/a/29848367/14257952)
 * str: input string to tokenize
 * delim: delimiter
-* return: the next segment of str originally ending with delim
+* return: the next segment of str originally ending with delim (the final segment is returned regardless)
 */
-char* strtokm(char *str, const char *delim)
+char* strtokm(char *str, const char *delim, bool *isFinalSegment)
 {
     static char *tok;
     static char *next;
-    char *m;
+    char *temp;
 
+    // check for invalid delimiter param
     if (delim == NULL) return NULL;
 
+    // extract the next token segment, starting at the beginning of str
+    // if str was provided
     tok = (str) ? str : next;
     if (tok == NULL) return NULL;
 
-    m = strstr(tok, delim);
+    // check for occurrence of delimiter in this token segment
+    temp = strstr(tok, delim);
 
-    if (m) {
-        next = m + strlen(delim);
-        *m = '\0';
+    if (temp) {
+        // move next pointer past the delimiter and reset m
+        next = temp + strlen(delim);
+        *temp = '\0';
     } else {
+        // this token segment doesn't have the delimiter, so it's the end
         next = NULL;
+    }
+
+    if (next == NULL) {
+        *isFinalSegment = true;
     }
 
     return tok;
@@ -256,7 +267,9 @@ char* expandPidVariable(char* stringIn) {
     char* stringTemp = calloc(strlen(stringIn) + 1, sizeof(char));
     int newLength = 0;
     int originalLength = strlen(stringIn);
-    char* token = strtokm(stringIn, pidVariable);
+    bool* isFinalSegment = malloc(sizeof(bool));
+    *isFinalSegment = false;
+    char* token = strtokm(stringIn, pidVariable, isFinalSegment);
 
     if (strlen(token) == originalLength) {
         // there are no occurrences of the pid variable
@@ -265,7 +278,7 @@ char* expandPidVariable(char* stringIn) {
         // There are some occurrences of the pid variable.
         // Continue to copy segments of stringIn while substituting
         // the smallsh pid for the variable
-        while (strlen(token) > 0) {
+        while (token) {
             // copy the string up to this point
             strcpy(stringTemp, stringOut);
 
@@ -274,16 +287,24 @@ char* expandPidVariable(char* stringIn) {
             free(stringOut);  // stringOut was copied to stringTemp
             newLength = strlen(stringTemp) + strlen(token) + strlen(pidString) + 1;
             stringOut = calloc(newLength, sizeof(char));
-            stringTemp = calloc(newLength, sizeof(char));  // for next iteration
 
-            // restore stringOut from before this iteration, and append this token + pid
+            // restore stringOut from before this iteration
             strcpy(stringOut, stringTemp);
             strcat(stringOut, token);
-            strcat(stringOut, pidString);
+
+            // Check for the special case of the final segment, because strtokm() will need to 
+            // return a token for the final segment even if there isn't a delimiter in it
+            if (!*isFinalSegment) {
+                // append the pid, because the delimiter was found in this token
+                strcat(stringOut, pidString);
+            }
+
+            // for next iteration
             free(stringTemp);
+            stringTemp = calloc(newLength, sizeof(char));
 
             // try to extract another token
-            token = strtokm(NULL, pidVariable);
+            token = strtokm(NULL, pidVariable, isFinalSegment);
         }
     }
 
