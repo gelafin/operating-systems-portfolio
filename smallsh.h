@@ -103,7 +103,7 @@ void printToTerminal(const char* text, bool isError) {
 struct CommandLine* parseCommandString(char* stringInput) {
     char* indexPointer;
     char* inputToken;
-    char* delimiter = " \n";  // need to add \n because fgets appends it
+    char* delimiter = " ";
     char inputRedirectChar = '<';
     char outputRedirectChar = '>';
     char backgroundChar = '&';
@@ -214,6 +214,37 @@ char* getPidString() {
 
 
 /*
+* Imitates strtok() but uses a string delimiter
+* (copied from https://stackoverflow.com/a/29848367/14257952)
+* str: input string to tokenize
+* delim: delimiter
+* return: the next segment of str originally ending with delim
+*/
+char* strtokm(char *str, const char *delim)
+{
+    static char *tok;
+    static char *next;
+    char *m;
+
+    if (delim == NULL) return NULL;
+
+    tok = (str) ? str : next;
+    if (tok == NULL) return NULL;
+
+    m = strstr(tok, delim);
+
+    if (m) {
+        next = m + strlen(delim);
+        *m = '\0';
+    } else {
+        next = NULL;
+    }
+
+    return tok;
+}
+
+
+/*
 * Replaces all instances of the pid variable ($$) in stringIn with the smallsh pid
 * stringIn: string which may contain instances of "$$"
 * return: the input string with instances of "$$" replaced by the smallsh pid
@@ -225,8 +256,7 @@ char* expandPidVariable(char* stringIn) {
     char* stringTemp = calloc(strlen(stringIn) + 1, sizeof(char));
     int newLength = 0;
     int originalLength = strlen(stringIn);
-    char* tokenPointer;
-    char* token = strtok_r(stringIn, pidVariable, &tokenPointer);
+    char* token = strtokm(stringIn, pidVariable);
 
     if (strlen(token) == originalLength) {
         // there are no occurrences of the pid variable
@@ -235,7 +265,7 @@ char* expandPidVariable(char* stringIn) {
         // There are some occurrences of the pid variable.
         // Continue to copy segments of stringIn while substituting
         // the smallsh pid for the variable
-        while (token != NULL) {
+        while (strlen(token) > 0) {
             // copy the string up to this point
             strcpy(stringTemp, stringOut);
 
@@ -249,11 +279,11 @@ char* expandPidVariable(char* stringIn) {
             // restore stringOut from before this iteration, and append this token + pid
             strcpy(stringOut, stringTemp);
             strcat(stringOut, token);
-            strcat(stringOut, pidString);  // TODO: don't do this for the last iteration
+            strcat(stringOut, pidString);
             free(stringTemp);
 
             // try to extract another token
-            token = strtok_r(NULL, pidVariable, &tokenPointer);
+            token = strtokm(NULL, pidVariable);
         }
     }
 
@@ -270,6 +300,9 @@ char* getUserCommandString() {
 
     // get raw string from user
     fgets(userInput, MAX_INPUT_LENGTH + 1, stdin);
+
+    // remove \n appended by fgets (source: https://stackoverflow.com/a/28462221/14257952)
+    userInput[strcspn(userInput, "\n")] = 0;
 
     // return input, expanded with smallsh pid in place of $$
     return expandPidVariable(userInput);
