@@ -331,12 +331,19 @@ char* getUserCommandString() {
 
 
 /*
-* changes the current directory, supporting relative and absolute paths
+* Changes the current directory, supporting relative and absolute paths
+* If no argument is given, changes to the user's home directory
 * commandLine: pointer to a CommandLine struct which has the command line's details
 */
 void handleCdCommand(struct CommandLine* commandLine) {
-    // change the current directory to the new path
-    chdir(commandLine->args[0]);
+    // handle the command with no argument
+    if (!commandLine->args[0]) {
+        // change the current directory to the HOME directory
+        chdir(getenv("HOME"));
+    } else {
+        // change the current directory to the specified path
+        chdir(commandLine->args[0]);
+    }
 
     return;
 }
