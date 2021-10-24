@@ -354,6 +354,54 @@ void handleExitCommand() {
 
 
 /*
+* ignores a SIGINT signal (when a process receives a ctrl+Z interrupt signal)
+* signalNumber: used by sigaction() internally
+*/
+void ignoreSIGINT(int signalNumber) {
+    // do nothing, overriding default SIGINT handler behavior
+    char* debugMessage = "DEBUG: Caught SIGINT, ignoring\n";
+	write(STDOUT_FILENO, debugMessage, 50);
+
+    return;
+}
+
+
+/*
+* does setup to enable ignoreSIGINT to catch SIGINT signals
+* (adapted from lecture material)
+*/
+void setSIGINThandler() {
+    // initialize empty sigaction
+    struct sigaction SIGINTaction = {{0}};  // gcc bug: https://stackoverflow.com/a/13758286/14257952
+
+    // register handler function
+    SIGINTaction.sa_handler = ignoreSIGINT;
+
+    // block all catchable signals while handler is running
+	sigfillset(&SIGINTaction.sa_mask);
+
+    // make no flags set
+	SIGINTaction.sa_flags = 0;
+
+    // install the handler to associate the handler with the signal
+    sigaction(SIGINT, &SIGINTaction, NULL);
+
+    return;
+}
+
+
+/*
+* registers signal handlers for a new background child process
+*/
+void registerNewBgChildSignals() {
+    // ignore sigint
+    setSIGINThandler();
+
+    return;
+}
+
+
+/*
 * executes a command not directly supported by smallsh
 * (source: adapted from lecture material)
 * commandLine: pointer to a CommandLine struct which has the command line's details
@@ -364,8 +412,8 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
     char* childArgv[MAX_ARG_COUNT];  // must use char*[] for execvp() to work with args
     int copyIndex = 0;  // used by the loop that copies args into childArgv
     char* backgroundNoticePrefix = "background pid is ";
-    char* childPidString = calloc(10, sizeof(char));  // room for 10 digits
-    char* backgroundNotice = calloc(strlen(backgroundNoticePrefix) + 10, sizeof(char));  // room for 10 digits
+    char* childPidString = calloc(10, sizeof(char));  // room for 9 digits
+    char* backgroundNotice = calloc(strlen(backgroundNoticePrefix) + 10, sizeof(char));  // room for 9 digits
 
     // fork off a child process
     spawnPid = fork();
@@ -379,6 +427,11 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
         
         case 0:
             // Only the child process will execute this, because its spawnPid is 0
+
+            // if this child will be run in the background, it must handle signals differently (per specs)
+            if (commandLine->isBackground) {
+                registerNewBgChildSignals();
+            }
 
             /* 
             Prepare a vector of args for execvp 
