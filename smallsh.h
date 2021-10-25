@@ -361,6 +361,24 @@ void handleExitCommand() {
 
 
 /*
+* Prints the exit status of the last foreground process run by smallsh
+* If no foreground command has been run yet, prints 0
+*/
+void handleStatusCommand() {
+    int childStatus = 0;
+
+    // get exit status of last child, without blocking
+    waitpid(-1, &childStatus, WNOHANG);
+
+    // print notice
+    printf("exit status %d\n", childStatus);
+    fflush(NULL);
+
+    return;
+}
+
+
+/*
 * ignores a SIGINT signal (when a process receives a ctrl+Z interrupt signal)
 * signalNumber: used by sigaction() internally
 */
@@ -572,7 +590,7 @@ void executeCommand(struct CommandLine* commandLine) {
         handleExitCommand();
     } else if (isEqualString(commandLine->command, "status")) {
         // execute the status command
-        printToTerminal("status coming soon\n", false);
+        handleStatusCommand();
     } else {
         // execute a third-party command
         handleThirdPartyCommand(commandLine);
