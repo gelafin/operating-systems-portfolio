@@ -12,6 +12,7 @@
 #define MAX_INPUT_LENGTH 2048  // defined in specs
 #define MAX_ARG_COUNT 512  // defined in specs
 #define MAX_FILEPATH_LENGTH 32767  // source: https://superuser.com/questions/14883/what-is-the-longest-file-path-that-windows-can-handle
+#define MAX_BG_CHILDREN 100  // defined in specs
 
 
 struct CommandLine {
@@ -27,6 +28,10 @@ struct CommandLine {
 void printCommandPrompt();
 void printToTerminal(const char*, bool);
 struct CommandLine* parseCommandString(char*);
+
+
+// globals used to track PIDs of background child processes
+int GLOBAL_backgroundChildrenPids[MAX_BG_CHILDREN] = {0};
 
 
 /*
@@ -427,6 +432,79 @@ void registerNewBgChildSignals() {
 
 
 /*
+* adds a PID to the global array tracking background child PIDs
+* pid_in: pid to add to the global list
+*/
+void registerNewBgChildPid(pid_t pid_in) {
+    // add this process id to the list, at the first 0
+    for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
+        // find the spot in the array with the first 0
+        if (GLOBAL_backgroundChildrenPids[index] == 0) {
+            // add the pid to the list
+            GLOBAL_backgroundChildrenPids[index] = pid_in;
+        }
+    }
+
+    return;
+}
+
+
+/*
+* Removes a PID from the global array tracking background child PIDs
+* If the provided PID isn't in the array, nothing happens
+* pid_in: pid to remove from the global list
+*/
+void unregisterBgChildPid(pid_t pid_in) {
+    // remove this process id from the list, if found
+    for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
+        // find the spot in the array with the given pid
+        if (GLOBAL_backgroundChildrenPids[index] == pid_in) {
+            // Remove the pid from the list.
+            // No need to shift the remaining elements, because the function that adds
+            // elements will add in the first 0 spot
+            GLOBAL_backgroundChildrenPids[index] = 0;
+        }
+    }
+
+    return;
+}
+
+
+/*
+* Checks whether a PID is in the global array tracking background child PIDs
+* pid_in: pid to check for in the global list
+* return: true if the given PID is in the gloabl list; false if not
+*/
+bool isTrackedBgChild(pid_t pid_in) {
+    // check the list for this process id
+    for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
+        // find the spot in the array with the given pid
+        if (GLOBAL_backgroundChildrenPids[index] == pid_in) {
+            // pid was found
+            return true;
+        }
+    }
+
+    // pid was not found in the above loop
+    return false;
+}
+
+
+/*
+* does everything that needs to be done by a new child process
+*/
+void handleNewChild() {
+    // background children must handle signals differently (per specs)
+    registerNewBgChildSignals();
+
+    // track background children
+    registerNewBgChildPid(getpid());
+
+    return;
+}
+
+
+/*
 * executes a command not directly supported by smallsh
 * (source: adapted from lecture material)
 * commandLine: pointer to a CommandLine struct which has the command line's details
@@ -453,9 +531,8 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
         case 0:
             // Only the child process will execute this, because its spawnPid is 0
 
-            // if this child will be run in the background, it must handle signals differently (per specs)
             if (commandLine->isBackground) {
-                registerNewBgChildSignals();
+                handleNewChild();
             }
 
             /* 
@@ -529,20 +606,26 @@ void handleSIGCHLD(int signalNumber) {
     // reap zombie, collecting info about it
     childPid = wait(terminationStatus);
 
-    // convert numbers to strings
-    sprintf(childPidString, "%d", childPid);
-    sprintf(terminationStatusString, "%d", *terminationStatus);
+    // if this was a background child process, print a notice that it finished
+    if (isTrackedBgChild(childPid)) {
+        // convert numbers to strings
+        sprintf(childPidString, "%d", childPid);
+        sprintf(terminationStatusString, "%d", *terminationStatus);
 
-    // construct notice to sent to terminal
-    strcpy(notice, "Process ");
-    strcat(notice, childPidString);
-    strcat(notice, " terminated by signal ");
-    strcat(notice, terminationStatusString);
-    strcat(notice, "\n");
+        // construct notice to sent to terminal
+        strcpy(notice, "Process ");
+        strcat(notice, childPidString);
+        strcat(notice, " terminated by signal ");
+        strcat(notice, terminationStatusString);
+        strcat(notice, "\n");
 
-    // Notify the user of the process result,
-    // without using strlen(), which is not reentrant
-    write(STDOUT_FILENO, notice, 255);
+        // Notify the user of the process result,
+        // without using strlen(), which is not reentrant
+        write(STDOUT_FILENO, notice, 255);
+
+        // stop tracking this PID
+        unregisterBgChildPid(childPid);
+    }
 
     return;
 }
