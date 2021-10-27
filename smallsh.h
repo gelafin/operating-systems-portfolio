@@ -92,17 +92,22 @@ void printToTerminal(const char* text, bool isError) {
 
 
 /*
-* redirects stdin to point to a given file
+* Redirects stdin to point to a given file
+* If sourceFile isn't provided, stdin will be redirected to /dev/null
 * sourceFile: path of the file to use for stdin
 * (adapted from lesson material)
 */
 void redirectStdin(char* sourceFile) {
+    // check for redirecting to /dev/null
+    char* redirectPath = sourceFile ? sourceFile : "/dev/null";
+
     // open source file
-    int sourceFD = open(sourceFile, O_RDONLY);
+    int sourceFD = open(redirectPath, O_RDONLY);
 
     if (sourceFD == -1) { 
-        printToTerminal("couldn't open() input file. Check the path\n", true);
-		exit(1); 
+        printf("cannot open %s for input\n", redirectPath);
+        fflush(NULL);
+		exit(1);
 	}
 
     // redirect stdin to source file
@@ -117,17 +122,22 @@ void redirectStdin(char* sourceFile) {
 
 
 /*
-* redirects stdout to point to a given file
+* Redirects stdout to point to a given file
+* If outputFile isn't provided, stdout will be redirected to /dev/null
 * outputFile: path of the file to use for stdout
 * (adapted from lesson material)
 */
 void redirectStdout(char* outputFile) {
+    // check for redirecting to /dev/null
+    char* redirectPath = outputFile ? outputFile : "/dev/null";
+
     // open output file
-    int outputFD = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int outputFD = open(redirectPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
     if (outputFD == -1) { 
-        printToTerminal("couldn't open() output file. Check the path\n", true);
-		exit(1); 
+        printf("cannot open %s for output\n", redirectPath);
+        fflush(NULL);
+		exit(1);
 	}
 
     // redirect stdout to output file
@@ -594,14 +604,20 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
                 handleNewBgChild();
             }
 
-            // redirect input if the user asked to
+            // Redirect input if the user asked to
+            // Else, if it's background, suppress input (per specs)
             if (commandLine->inFile) {
                 redirectStdin(commandLine->inFile);
+            } else if (commandLine->isBackground) {
+                redirectStdin(NULL);
             }
 
-            // redirect output if the user asked to
+            // Redirect output if the user asked to
+            // Else, if it's background, suppress output (per specs)
             if (commandLine->outFile) {
                 redirectStdout(commandLine->outFile);
+            } else if (commandLine->isBackground) {
+                redirectStdout(NULL);
             }
 
             /* 
