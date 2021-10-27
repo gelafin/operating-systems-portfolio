@@ -31,6 +31,7 @@ struct CommandLine* parseCommandString(char*);
 
 
 // globals used to track PIDs of background child processes
+// syntax reminder from https://stackoverflow.com/a/201116/14257952
 int GLOBAL_backgroundChildrenPids[MAX_BG_CHILDREN] = {0};
 
 
@@ -91,6 +92,56 @@ void printToTerminal(const char* text, bool isError) {
 
 
 /*
+* redirects stdin to point to a given file
+* sourceFile: path of the file to use for stdin
+* (adapted from lesson material)
+*/
+void redirectStdin(char* sourceFile) {
+    // open source file
+    int sourceFD = open(sourceFile, O_RDONLY);
+
+    if (sourceFD == -1) { 
+        printToTerminal("couldn't open() input file. Check the path\n", true);
+		exit(1); 
+	}
+
+    // redirect stdin to source file
+	int result = dup2(sourceFD, 0);  // 0 is used for stdin default
+	if (result == -1) { 
+        printToTerminal("couldn't redirect stdin to input file via dup2(), but it was a good file\n", true);
+		exit(2); 
+	}
+
+    return;
+}
+
+
+/*
+* redirects stdout to point to a given file
+* outputFile: path of the file to use for stdout
+* (adapted from lesson material)
+*/
+void redirectStdout(char* outputFile) {
+    // open output file
+    int outputFD = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+    if (outputFD == -1) { 
+        printToTerminal("couldn't open() output file. Check the path\n", true);
+		exit(1); 
+	}
+
+    // redirect stdout to output file
+	int result = dup2(outputFD, 1);  // 1 is used for stdout default
+	if (result == -1) { 
+        printToTerminal("couldn't redirect stdout to output file via dup2(), but it was a good file\n", true);
+		exit(2); 
+	}
+
+    return;
+}
+
+
+/*
 * reads a line from the prompt and saves parsed input to the given struct
 * does not check for syntax errors (per specs)
 * does not support quoting, so arguments with spaces are not possible (per specs)
@@ -119,11 +170,16 @@ struct CommandLine* parseCommandString(char* stringInput) {
     bool isSpecialChar = false;
     struct CommandLine* commandLine = malloc(sizeof(struct CommandLine));
 
+    printf("\tDEBUG: in parseCommandString\n");
+    fflush(NULL);
+
     // initialize the CommandLine struct's fixed-size array to all null pointers
     // and initialize its other defaults
     commandLine->args = calloc(MAX_ARG_COUNT, sizeof(char*));
     commandLine->argCount = 0;
     commandLine->isBackground = false;
+    commandLine->inFile = NULL;
+    commandLine->outFile = NULL;
 
     // Process first token now, because it's unique.
     // It is the first that shows whether input is empty, and
@@ -322,6 +378,9 @@ char* expandPidVariable(char* stringIn) {
 * return: user input, expanded with smallsh pid in place of $$
 */
 char* getUserCommandString() {
+    printf("\tDEBUG: in getUserCommandString\n");
+    fflush(NULL);
+
     char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
 
     // get raw string from user
@@ -493,7 +552,7 @@ bool isTrackedBgChild(pid_t pid_in) {
 /*
 * does everything that needs to be done by a new child process
 */
-void handleNewChild() {
+void handleNewBgChild() {
     // background children must handle signals differently (per specs)
     registerNewBgChildSignals();
 
@@ -532,7 +591,17 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             // Only the child process will execute this, because its spawnPid is 0
 
             if (commandLine->isBackground) {
-                handleNewChild();
+                handleNewBgChild();
+            }
+
+            // redirect input if the user asked to
+            if (commandLine->inFile) {
+                redirectStdin(commandLine->inFile);
+            }
+
+            // redirect output if the user asked to
+            if (commandLine->outFile) {
+                redirectStdout(commandLine->outFile);
             }
 
             /* 
@@ -597,6 +666,9 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 * signalNumber: used by sigaction() internally
 */
 void handleSIGCHLD(int signalNumber) {
+    printf("\nDEBUG: caught SIGCHLD with signal number %d\n", signalNumber);
+    fflush(NULL);
+
     pid_t childPid;
     char* childPidString = calloc(10, sizeof(char));  // space for 10 digits
     int* terminationStatus = malloc(sizeof(int));
@@ -661,6 +733,9 @@ void setSIGCHLDhandler() {
 */
 void executeCommand(struct CommandLine* commandLine) {
     const char commentChar = '#';
+
+    printf("\n\tDEBUG: in executeCommand(), executing command %s\n", commandLine->command);
+    fflush(NULL);
 
     // ignore comment lines
     if (commandLine->command[0] == commentChar) {
