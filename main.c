@@ -11,8 +11,8 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    setSIGCHLDhandler();
-    //setSIGINThandler();
+    //setSIGCHLDhandler();
+    setSIGINThandler();
 
     while (true) {
         printCommandPrompt();
@@ -21,13 +21,17 @@ int main(int argc, char* argv[]) {
         fflush(NULL);
 
         struct CommandLine* commandLine = parseCommandString(getUserCommandString());
-        printf("DEBUG: handling command %s...", commandLine->command);
-        fflush(NULL);
 
-        executeCommand(commandLine);
+        // handle empty input (also caused by signals interrupting fgets)
+        if (commandLine->command) {
+            printf("DEBUG: handling command %s...", commandLine->command);
+            fflush(NULL);
 
-        // clean up placeholder (memory leaks allowed at this point in class)
-        // free(commandLine);
+            executeCommand(commandLine);
+
+            // clean up placeholder (memory leaks allowed at this point in class)
+            // free(commandLine);
+        }
     }
 
     return EXIT_SUCCESS;

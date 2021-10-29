@@ -96,6 +96,7 @@ void printToTerminal(const char* text, bool isError) {
 * If sourceFile isn't provided, stdin will be redirected to /dev/null
 * sourceFile: path of the file to use for stdin
 * (adapted from lesson material)
+* (source of courage to open /dev/null: https://stackoverflow.com/a/14846891/14257952)
 */
 void redirectStdin(char* sourceFile) {
     // check for redirecting to /dev/null
@@ -126,6 +127,7 @@ void redirectStdin(char* sourceFile) {
 * If outputFile isn't provided, stdout will be redirected to /dev/null
 * outputFile: path of the file to use for stdout
 * (adapted from lesson material)
+* (source of courage to open /dev/null: https://stackoverflow.com/a/14846891/14257952)
 */
 void redirectStdout(char* outputFile) {
     // check for redirecting to /dev/null
@@ -459,7 +461,8 @@ void handleStatusCommand() {
 void ignoreSIGINT(int signalNumber) {
     // do nothing, overriding default SIGINT handler behavior
     char* debugMessage = "DEBUG: Caught SIGINT, ignoring\n";
-	write(STDOUT_FILENO, debugMessage, 50);
+	write(STDOUT_FILENO, debugMessage, 31);
+    fflush(NULL);
 
     return;
 }
@@ -475,6 +478,31 @@ void setSIGINThandler() {
 
     // register handler function
     SIGINTaction.sa_handler = ignoreSIGINT;
+
+    // block all catchable signals while handler is running
+	sigfillset(&SIGINTaction.sa_mask);
+
+    // make no flags set
+	SIGINTaction.sa_flags = 0;
+
+    // install the handler to associate the handler with the signal
+    sigaction(SIGINT, &SIGINTaction, NULL);
+
+    return;
+}
+
+
+/*
+* resets SIGINT signal handling behavior to default
+* (adapted from lecture material)
+* (inspired by https://stackoverflow.com/a/24804019/14257952)
+*/
+void resetSIGINThandler() {
+    // initialize empty sigaction
+    struct sigaction SIGINTaction = {{0}};  // gcc bug: https://stackoverflow.com/a/13758286/14257952
+
+    // register handler function back to default
+    SIGINTaction.sa_handler = SIG_DFL;
 
     // block all catchable signals while handler is running
 	sigfillset(&SIGINTaction.sa_mask);
@@ -602,6 +630,9 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
             if (commandLine->isBackground) {
                 handleNewBgChild();
+            } else {
+                // this is a foreground child, so SIGINT shouldn't be blocked (per specs)
+                resetSIGINThandler();
             }
 
             // Redirect input if the user asked to
@@ -730,7 +761,7 @@ void setSIGCHLDhandler() {
     // register handler function
     SIGCHLDaction.sa_handler = handleSIGCHLD;
 
-    // block all catchable signals while handle_SIGINT is running
+    // block all catchable signals while ignore_SIGINT is running
 	sigfillset(&SIGCHLDaction.sa_mask);
 
     // make no flags set
