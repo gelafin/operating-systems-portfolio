@@ -11,8 +11,8 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    //setSIGCHLDhandler();
-    setSIGINThandler();
+    setSIGCHLDhandler();
+    //setSIGINThandler();
 
     while (true) {
         printCommandPrompt();
@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
 
         // handle empty input (also caused by signals interrupting fgets)
         if (commandLine->command) {
-            printf("DEBUG: handling command %s...", commandLine->command);
+            printf("\tDEBUG: handling command %s...", commandLine->command);
             fflush(NULL);
 
             executeCommand(commandLine);
