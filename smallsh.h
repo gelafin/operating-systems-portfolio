@@ -740,7 +740,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
         
         default:
             // Only the parent process (smallsh) will execute this. Its spawnPid is the child's process ID
-            if (!commandLine->isBackground) {
+            if (!commandLine->isBackground || GLOBAL_fgOnlyMode) {
                 // Wait for child to finish
                 spawnPid = waitpid(spawnPid, &childStatus, 0);
 
