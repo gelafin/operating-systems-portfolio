@@ -12,6 +12,7 @@
 */
 int main(int argc, char* argv[]) {
     setSIGINThandler();
+    setSIGTSTPhandler(false);  // child processes override this when created
 
     while (true) {
         printCommandPrompt();
@@ -26,6 +27,8 @@ int main(int argc, char* argv[]) {
         // clean up zombies
         reapAll();
     }
+
+    // enter or exit foreground only mode
 
     return EXIT_SUCCESS;
 }

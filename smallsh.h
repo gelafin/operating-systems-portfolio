@@ -34,6 +34,7 @@ struct CommandLine* parseCommandString(char*);
 // syntax reminder from https://stackoverflow.com/a/201116/14257952
 pid_t GLOBAL_backgroundChildrenPids[MAX_BG_CHILDREN] = {0};
 int GLOBAL_lastForegroundChildStatus = 0;  // default to 0 per specs
+bool GLOBAL_fgOnlyMode = false;
 
 
 /*
@@ -445,7 +446,7 @@ void handleStatusCommand() {
 
 
 /*
-* ignores a SIGINT signal (when a process receives a ctrl+Z interrupt signal)
+* ignores a SIGINT signal (when a process receives a ctrl+C interrupt signal)
 * signalNumber: used by sigaction() internally
 */
 void ignoreSIGINT(int signalNumber) {
@@ -453,6 +454,59 @@ void ignoreSIGINT(int signalNumber) {
     //char* debugMessage = "DEBUG: Caught SIGINT, ignoring\n";
 	//write(STDOUT_FILENO, debugMessage, 31);
     //fflush(NULL);
+
+    return;
+}
+
+
+/*
+* ignores a SIGTSTP signal (when a process receives a ctrl+Z signal)
+* signalNumber: used by sigaction() internally
+*/
+void handleSIGTSTP(int signalNumber) {
+    // print a message that foreground-only mode will be turned on
+    char* message = "Entering foreground-only mode (& is now ignored)\n";
+	write(STDOUT_FILENO, message, 49);  // strlen() isn't reentrant
+    fflush(NULL);
+
+    // enter foreground-only mode
+    GLOBAL_fgOnlyMode = true;
+
+    return;
+}
+
+
+/*
+* ignores a SIGTSTP signal (when a process receives a ctrl+Z signal)
+* signalNumber: used by sigaction() internally
+*/
+void ignoreSIGTSTP(int signalNumber) {
+    // do nothing, overriding default SIGTSTP handler behavior
+
+    return;
+}
+
+
+/*
+* does setup to enable SIGTSTP signals to be handled by custom functions
+* (adapted from lecture material)
+* ignore: if true, ignoreSIGTSTP will handle the signal; if false, handleSIGTSTP will
+*/
+void setSIGTSTPhandler(bool ignore) {
+    // initialize empty sigaction
+    struct sigaction SIGTSTPaction = {{0}};  // gcc bug: https://stackoverflow.com/a/13758286/14257952
+
+    // register handler function
+    SIGTSTPaction.sa_handler = ignore ? ignoreSIGTSTP : handleSIGTSTP;
+
+    // block all catchable signals while handler is running
+	sigfillset(&SIGTSTPaction.sa_mask);
+
+    // make no flags set
+	SIGTSTPaction.sa_flags = 0;
+
+    // install the handler to associate the handler with the signal
+    sigaction(SIGTSTP, &SIGTSTPaction, NULL);
 
     return;
 }
@@ -619,7 +673,11 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
         case 0:
             // Only the child process will execute this, because its spawnPid is 0
 
-            if (commandLine->isBackground) {
+            // ignore SIGTSTP
+            setSIGTSTPhandler(true);
+
+            // check if this should be run in the background
+            if (commandLine->isBackground && !GLOBAL_fgOnlyMode) {
                 handleNewBgChild();
             } else {
                 // this is a foreground child, so SIGINT shouldn't be blocked (per specs)
@@ -630,7 +688,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             // Else, if it's background, suppress input (per specs)
             if (commandLine->inFile) {
                 redirectStdin(commandLine->inFile);
-            } else if (commandLine->isBackground) {
+            } else if (commandLine->isBackground && !GLOBAL_fgOnlyMode) {
                 redirectStdin(NULL);
             }
 
@@ -638,7 +696,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             // Else, if it's background, suppress output (per specs)
             if (commandLine->outFile) {
                 redirectStdout(commandLine->outFile);
-            } else if (commandLine->isBackground) {
+            } else if (commandLine->isBackground && !GLOBAL_fgOnlyMode) {
                 redirectStdout(NULL);
             }
 
@@ -681,7 +739,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
                 // update status
                 GLOBAL_lastForegroundChildStatus = childStatus;
-            } else {
+            } else if (!GLOBAL_fgOnlyMode) {
                 // skip the wait and let the child become a zombie process (reaped in outer loop)
 
                 // track background children
