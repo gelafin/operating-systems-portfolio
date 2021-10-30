@@ -11,7 +11,7 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    //setSIGINThandler();
+    setSIGINThandler();
 
     while (true) {
         printCommandPrompt();

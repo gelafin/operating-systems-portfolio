@@ -738,25 +738,51 @@ void reapAll() {
             // waitpid updated childPid after checking status
             if (childPid > 0) {
                 // This was a background process that just ended.
-                // Construct notice to sent to terminal
-                sprintf(childPidString, "%d", childPid);
-                sprintf(terminationStatusString, "%d", *terminationStatus);
-                strcpy(notice, "background pid ");
-                strcat(notice, childPidString);
-                strcat(notice, " is done: exit value ");
-                strcat(notice, terminationStatusString);
-                strcat(notice, "\n");
-                
-                // get length of notice
-                int noticeLength = 0;
-                char* checkCharPointer = notice;
-                while (*checkCharPointer != '\0') {
-                    ++noticeLength;
-                    ++checkCharPointer;
-                }
+                // Print a notice to the terminal based on termination status
+                if (WIFEXITED(*terminationStatus)) {
+                    // process exited normally
+                    sprintf(childPidString, "%d", childPid);
+                    sprintf(terminationStatusString, "%d", *terminationStatus);
+                    strcpy(notice, "background pid ");
+                    strcat(notice, childPidString);
+                    strcat(notice, " is done: exit value ");
+                    strcat(notice, terminationStatusString);
+                    strcat(notice, "\n");
 
-                // print the notice
-                write(STDOUT_FILENO, notice, noticeLength);
+                    // get length of notice
+                    int noticeLength = 0;
+                    char* checkCharPointer = notice;
+                    while (*checkCharPointer != '\0') {
+                        ++noticeLength;
+                        ++checkCharPointer;
+                    }
+
+                    // print the notice
+                    write(STDOUT_FILENO, notice, noticeLength);
+                } else {
+                    // Process was terminated by a signal.
+                    // Print the number of the signal that terminated the process
+                    sprintf(childPidString, "%d", childPid);
+                    sprintf(terminationStatusString, "%d", WTERMSIG(*terminationStatus));
+                    strcpy(notice, "background pid ");
+                    strcat(notice, childPidString);
+                    strcat(notice, " is done: terminated by signal ");
+                    strcat(notice, terminationStatusString);
+                    strcat(notice, "\n");
+
+                    // get length of notice
+                    int noticeLength = 0;
+                    char* checkCharPointer = notice;
+                    while (*checkCharPointer != '\0') {
+                        ++noticeLength;
+                        ++checkCharPointer;
+                    }
+
+                    // print the notice
+                    write(STDOUT_FILENO, notice, noticeLength);
+                }
+                
+
             }
         }
     }
