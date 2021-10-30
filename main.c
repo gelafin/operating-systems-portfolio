@@ -11,7 +11,6 @@
 *       gcc --std=gnu99 -o smallsh main.c
 */
 int main(int argc, char* argv[]) {
-    setSIGCHLDhandler();
     //setSIGINThandler();
 
     while (true) {
@@ -28,10 +27,10 @@ int main(int argc, char* argv[]) {
             fflush(NULL);
 
             executeCommand(commandLine);
-
-            // clean up placeholder (memory leaks allowed at this point in class)
-            // free(commandLine);
         }
+
+        // clean up zombies
+        reapAll();
     }
 
     return EXIT_SUCCESS;

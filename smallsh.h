@@ -690,8 +690,11 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             if (!commandLine->isBackground) {
                 // Wait for child to finish
                 spawnPid = waitpid(spawnPid, &childStatus, 0);
+
+                // update status
+                GLOBAL_lastForegroundChildStatus = childStatus;
             } else {
-                // skip the wait and let the child become a zombie process (reaped in SIGCHLD handler)
+                // skip the wait and let the child become a zombie process (reaped in outer loop)
 
                 // track background children
                 registerNewBgChildPid(spawnPid);
@@ -714,89 +717,54 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
 
 /*
-* handles a SIGCHLD signal (when a child process of smallsh terminates/stops/resumes)
-* (source: https://stackoverflow.com/a/1512327/14257952)
-* signalNumber: used by sigaction() internally
+* Reaps all zombie processes and displays a notice of termination status
 */
-void handleSIGCHLD(int signalNumber) {
-    // write(STDOUT_FILENO, "\n\tDEBUG: caught SIGCHLD\n", 24);
-
+void reapAll() {
     pid_t childPid;
     char* childPidString = calloc(10, sizeof(char));  // space for 10 digits
     int* terminationStatus = malloc(sizeof(int));
     char* terminationStatusString = calloc(10, sizeof(char));  // space for 10 digits
     char* notice = calloc(255, sizeof(char));
 
-    // reap zombie, collecting info about it
-    childPid = waitpid(-1, terminationStatus, WNOHANG);
-    if (childPid == -1) {
-        perror("sigchld handler: \n");
-        fflush(NULL);
+    // check status of all tracked background processes 
+    // (NOT checking foreground here, because they need to be checked for status command)
+    for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
+        childPid = GLOBAL_backgroundChildrenPids[index];
+
+        // only reap tracked PIDs
+        if (childPid > 0) {
+            childPid = waitpid(childPid, terminationStatus, WNOHANG);
+
+            // waitpid updated childPid after checking status
+            if (childPid > 0) {
+                // This was a background process that just ended.
+                // Construct notice to sent to terminal
+                sprintf(childPidString, "%d", childPid);
+                sprintf(terminationStatusString, "%d", *terminationStatus);
+                strcpy(notice, "background pid ");
+                strcat(notice, childPidString);
+                strcat(notice, " is done: exit value ");
+                strcat(notice, terminationStatusString);
+                strcat(notice, "\n");
+                
+                // get length of notice
+                int noticeLength = 0;
+                char* checkCharPointer = notice;
+                while (*checkCharPointer != '\0') {
+                    ++noticeLength;
+                    ++checkCharPointer;
+                }
+
+                // print the notice
+                write(STDOUT_FILENO, notice, noticeLength);
+            }
+        }
     }
 
-    // if it was a foreground process that just ended, record its status without a notice to the user
-    if (!isTrackedBgChild(childPid)) {
-        // DEBUG
-        sprintf(childPidString, "%d", childPid);
-        strcpy(notice, "foreground child pid ");
-        strcat(notice, childPidString);
-        strcat(notice, "\n");
-        // get length of notice
-        int noticeLength = 0;
-        char* checkCharPointer = notice;
-        while (*checkCharPointer != '\0') {
-            ++noticeLength;
-            ++checkCharPointer;
-        }
-        write(STDOUT_FILENO, notice, noticeLength);
-
-        GLOBAL_lastForegroundChildStatus = *terminationStatus;
-    } else {
-        // this was a background process that just ended
-        // construct notice to sent to terminal
-        sprintf(childPidString, "%d", childPid);
-        sprintf(terminationStatusString, "%d", *terminationStatus);
-        strcpy(notice, "background pid ");
-        strcat(notice, childPidString);
-        strcat(notice, " is done: exit value ");
-        strcat(notice, terminationStatusString);
-        strcat(notice, "\n");
-        
-        // get length of notice
-        int noticeLength = 0;
-        char* checkCharPointer = notice;
-        while (*checkCharPointer != '\0') {
-            ++noticeLength;
-            ++checkCharPointer;
-        }
-
-        // print the notice
-        write(STDOUT_FILENO, notice, noticeLength);
-    }
-
-    return;
-}
-
-
-/*
-* does setup to enable handleSIGCHLD to catch SIGCHLD signals
-* (adapted from lecture material)
-*/
-void setSIGCHLDhandler() {
-    // initialize empty sigaction
-    struct sigaction SIGCHLDaction = {{0}};  // gcc bug: https://stackoverflow.com/a/13758286/14257952
-
-    // register handler function
-    SIGCHLDaction.sa_handler = handleSIGCHLD;
-
-    // block all catchable signals while ignore_SIGINT is running
-	sigfillset(&SIGCHLDaction.sa_mask);
-
-    // make no flags set
-	SIGCHLDaction.sa_flags = 0;
-
-    // install the handler to associate the handler with the signal
-    sigaction(SIGCHLD, &SIGCHLDaction, NULL);
+    // get exit status of all terminated background processes
+    // while (childPid = waitpid(-1, terminationStatus, WNOHANG) != -1) {
+    //     // zombie was reaped by waitpid
+    // }
 
     return;
 }
