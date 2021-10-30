@@ -464,13 +464,20 @@ void ignoreSIGINT(int signalNumber) {
 * signalNumber: used by sigaction() internally
 */
 void handleSIGTSTP(int signalNumber) {
-    // print a message that foreground-only mode will be turned on
-    char* message = "Entering foreground-only mode (& is now ignored)\n";
-	write(STDOUT_FILENO, message, 49);  // strlen() isn't reentrant
-    fflush(NULL);
+    if (!GLOBAL_fgOnlyMode) {
+        // print a message that foreground-only mode will be turned on
+        char* message = "Entering foreground-only mode (& is now ignored)\n";
+        write(STDOUT_FILENO, message, 49);  // strlen() isn't reentrant
+        fflush(NULL);
+    } else {
+        // print a message that foreground-only mode will be turned off
+        char* message = "Exiting foreground-only mode\n";
+        write(STDOUT_FILENO, message, 29);  // strlen() isn't reentrant
+        fflush(NULL);
+    }
 
-    // enter foreground-only mode
-    GLOBAL_fgOnlyMode = true;
+    // toggle foreground-only mode
+    GLOBAL_fgOnlyMode = !GLOBAL_fgOnlyMode;
 
     return;
 }
