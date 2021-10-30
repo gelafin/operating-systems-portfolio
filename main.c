@@ -16,16 +16,10 @@ int main(int argc, char* argv[]) {
     while (true) {
         printCommandPrompt();
 
-        printf(" DEBUG: getting new command...\n");
-        fflush(NULL);
-
         struct CommandLine* commandLine = parseCommandString(getUserCommandString());
 
         // handle empty input (also caused by signals interrupting fgets)
         if (commandLine->command) {
-            printf("\tDEBUG: handling command %s...", commandLine->command);
-            fflush(NULL);
-
             executeCommand(commandLine);
         }
 

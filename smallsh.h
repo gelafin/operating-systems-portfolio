@@ -183,9 +183,6 @@ struct CommandLine* parseCommandString(char* stringInput) {
     bool isSpecialChar = false;
     struct CommandLine* commandLine = malloc(sizeof(struct CommandLine));
 
-    printf("\tDEBUG: in parseCommandString\n");
-    fflush(NULL);
-
     // initialize the CommandLine struct's fixed-size array to all null pointers
     // and initialize its other defaults
     commandLine->args = calloc(MAX_ARG_COUNT, sizeof(char*));
@@ -391,9 +388,6 @@ char* expandPidVariable(char* stringIn) {
 * return: user input, expanded with smallsh pid in place of $$
 */
 char* getUserCommandString() {
-    printf("\tDEBUG: in getUserCommandString\n");
-    fflush(NULL);
-
     char* userInput = calloc(MAX_INPUT_LENGTH, sizeof(char));
 
     // get raw string from user
@@ -456,9 +450,9 @@ void handleStatusCommand() {
 */
 void ignoreSIGINT(int signalNumber) {
     // do nothing, overriding default SIGINT handler behavior
-    char* debugMessage = "DEBUG: Caught SIGINT, ignoring\n";
-	write(STDOUT_FILENO, debugMessage, 31);
-    fflush(NULL);
+    //char* debugMessage = "DEBUG: Caught SIGINT, ignoring\n";
+	//write(STDOUT_FILENO, debugMessage, 31);
+    //fflush(NULL);
 
     return;
 }
@@ -536,9 +530,6 @@ void registerNewBgChildPid(pid_t pid_in) {
             // add the pid to the list
             GLOBAL_backgroundChildrenPids[index] = pid_in;
 
-            // DEBUG
-            printf("\tDEBUG: started tracking new pid %d at index %d: %d\n", pid_in, index, GLOBAL_backgroundChildrenPids[index]);
-
             break;
         }
     }
@@ -578,9 +569,6 @@ void unregisterBgChildPid(pid_t pid_in) {
 bool isTrackedBgChild(pid_t pid_in) {
     // check the list for this process id
     for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
-        // DEBUG
-        printf("\tDEBUG: pid at index %d: %d\tpid given: %d\n", index, GLOBAL_backgroundChildrenPids[index], pid_in);
-        fflush(NULL);
         // find the spot in the array with the given pid
         if (GLOBAL_backgroundChildrenPids[index] == pid_in) {
             // pid was found
@@ -802,9 +790,6 @@ void reapAll() {
 */
 void executeCommand(struct CommandLine* commandLine) {
     const char commentChar = '#';
-
-    printf("\n\tDEBUG: in executeCommand(), executing command %s\n", commandLine->command);
-    fflush(NULL);
 
     // ignore comment lines
     if (commandLine->command[0] == commentChar) {
