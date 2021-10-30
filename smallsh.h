@@ -32,7 +32,7 @@ struct CommandLine* parseCommandString(char*);
 
 // globals used to track PIDs of background child processes
 // syntax reminder from https://stackoverflow.com/a/201116/14257952
-int GLOBAL_backgroundChildrenPids[MAX_BG_CHILDREN] = {0};
+pid_t GLOBAL_backgroundChildrenPids[MAX_BG_CHILDREN] = {0};
 int GLOBAL_lastForegroundChildStatus = 0;  // default to 0 per specs
 
 
@@ -535,6 +535,11 @@ void registerNewBgChildPid(pid_t pid_in) {
         if (GLOBAL_backgroundChildrenPids[index] == 0) {
             // add the pid to the list
             GLOBAL_backgroundChildrenPids[index] = pid_in;
+
+            // DEBUG
+            printf("\tDEBUG: started tracking new pid %d at index %d: %d\n", pid_in, index, GLOBAL_backgroundChildrenPids[index]);
+
+            break;
         }
     }
 
@@ -556,6 +561,8 @@ void unregisterBgChildPid(pid_t pid_in) {
             // No need to shift the remaining elements, because the function that adds
             // elements will add in the first 0 spot
             GLOBAL_backgroundChildrenPids[index] = 0;
+
+            break;
         }
     }
 
@@ -571,6 +578,9 @@ void unregisterBgChildPid(pid_t pid_in) {
 bool isTrackedBgChild(pid_t pid_in) {
     // check the list for this process id
     for (int index = 0; index < MAX_BG_CHILDREN; ++index) {
+        // DEBUG
+        printf("\tDEBUG: pid at index %d: %d\tpid given: %d\n", index, GLOBAL_backgroundChildrenPids[index], pid_in);
+        fflush(NULL);
         // find the spot in the array with the given pid
         if (GLOBAL_backgroundChildrenPids[index] == pid_in) {
             // pid was found
@@ -589,9 +599,6 @@ bool isTrackedBgChild(pid_t pid_in) {
 void handleNewBgChild() {
     // background children must handle signals differently (per specs)
     registerNewBgChildSignals();
-
-    // track background children
-    registerNewBgChildPid(getpid());
 
     return;
 }
@@ -686,6 +693,9 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
             } else {
                 // skip the wait and let the child become a zombie process (reaped in SIGCHLD handler)
 
+                // track background children
+                registerNewBgChildPid(spawnPid);
+                
                 // convert number to string
                 sprintf(childPidString, "%d", spawnPid);
 
@@ -709,7 +719,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 * signalNumber: used by sigaction() internally
 */
 void handleSIGCHLD(int signalNumber) {
-    write(STDOUT_FILENO, "\n\tDEBUG: caught SIGCHLD\n", 24);
+    // write(STDOUT_FILENO, "\n\tDEBUG: caught SIGCHLD\n", 24);
 
     pid_t childPid;
     char* childPidString = calloc(10, sizeof(char));  // space for 10 digits
@@ -719,18 +729,36 @@ void handleSIGCHLD(int signalNumber) {
 
     // reap zombie, collecting info about it
     childPid = waitpid(-1, terminationStatus, WNOHANG);
+    if (childPid == -1) {
+        perror("sigchld handler: \n");
+        fflush(NULL);
+    }
 
     // if it was a foreground process that just ended, record its status without a notice to the user
-    if (isTrackedBgChild(childPid)) {
+    if (!isTrackedBgChild(childPid)) {
+        // DEBUG
+        sprintf(childPidString, "%d", childPid);
+        strcpy(notice, "foreground child pid ");
+        strcat(notice, childPidString);
+        strcat(notice, "\n");
+        // get length of notice
+        int noticeLength = 0;
+        char* checkCharPointer = notice;
+        while (*checkCharPointer != '\0') {
+            ++noticeLength;
+            ++checkCharPointer;
+        }
+        write(STDOUT_FILENO, notice, noticeLength);
+
         GLOBAL_lastForegroundChildStatus = *terminationStatus;
     } else {
         // this was a background process that just ended
         // construct notice to sent to terminal
         sprintf(childPidString, "%d", childPid);
         sprintf(terminationStatusString, "%d", *terminationStatus);
-        strcpy(notice, "\tDEBUG: Peeking first childPid: ");
+        strcpy(notice, "background pid ");
         strcat(notice, childPidString);
-        strcat(notice, " has termination status ");
+        strcat(notice, " is done: exit value ");
         strcat(notice, terminationStatusString);
         strcat(notice, "\n");
         
@@ -745,60 +773,6 @@ void handleSIGCHLD(int signalNumber) {
         // print the notice
         write(STDOUT_FILENO, notice, noticeLength);
     }
-
-    // reap all zombie children, collecting their info and printing messages if needed
-    // while ((childPid = waitpid(-1, terminationStatus, WNOHANG)) != -1) {
-    //     // convert numbers to strings
-    //     sprintf(childPidString, "%d", childPid);
-    //     sprintf(terminationStatusString, "%d", *terminationStatus);
-
-    //     // get length of notice
-    //     int noticeLength = 0;
-    //     char* checkCharPointer = notice;
-    //     while (*checkCharPointer != '\0') {
-    //         ++noticeLength;
-    //         ++checkCharPointer;
-    //     }
-
-    //     // construct notice to sent to terminal
-    //     strcpy(notice, "Process ");
-    //     strcat(notice, childPidString);
-    //     strcat(notice, " termination status ");
-    //     strcat(notice, terminationStatusString);
-    //     strcat(notice, "\n");
-
-    //     // get length of notice
-    //     // without using strlen(), which is not reentrant
-
-    //     // Notify the user of the process result
-    //     write(STDOUT_FILENO, notice, noticeLength);
-
-    //     // stop tracking this PID
-    //     unregisterBgChildPid(childPid);
-    // }
-
-    // if this was a background child process, print a notice that it finished
-    // if (isTrackedBgChild(childPid)) {
-    //     // convert numbers to strings
-    //     sprintf(childPidString, "%d", childPid);
-    //     sprintf(terminationStatusString, "%d", *terminationStatus);
-
-    //     // construct notice to sent to terminal
-    //     strcpy(notice, "Process ");
-    //     strcat(notice, childPidString);
-    //     strcat(notice, " termination status ");
-    //     strcat(notice, terminationStatusString);
-    //     strcat(notice, "\n");
-
-    //     // get length of notice
-    //     // without using strlen(), which is not reentrant
-
-    //     // Notify the user of the process result
-    //     write(STDOUT_FILENO, notice, noticeLength);
-
-    //     // stop tracking this PID
-    //     unregisterBgChildPid(childPid);
-    // }
 
     return;
 }
