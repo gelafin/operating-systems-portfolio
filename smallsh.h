@@ -156,6 +156,29 @@ void redirectStdout(char* outputFile) {
 
 
 /*
+* counts the number of spaces in a string
+* return: the number of spaces in the given string
+*/
+int countSpaces(char* stringIn) {
+    int spacesCount = 0;
+    char* charCheckPointer = stringIn;
+
+    // search for spaces in the string
+    while (*charCheckPointer != '\0') {
+        if (*charCheckPointer == ' ') {
+            // found a space
+            ++spacesCount;
+        }
+
+        // advance pointer
+        ++charCheckPointer;
+    }
+
+    return spacesCount;
+}
+
+
+/*
 * reads a line from the prompt and saves parsed input to the given struct
 * does not check for syntax errors (per specs)
 * does not support quoting, so arguments with spaces are not possible (per specs)
@@ -183,6 +206,8 @@ struct CommandLine* parseCommandString(char* stringInput) {
     bool argsAreDone = false;
     bool isSpecialChar = false;
     struct CommandLine* commandLine = malloc(sizeof(struct CommandLine));
+    int tokenCount = 0;
+    int tokenIndex = 0;
 
     // initialize the CommandLine struct's fixed-size array to all null pointers
     // and initialize its other defaults
@@ -203,17 +228,29 @@ struct CommandLine* parseCommandString(char* stringInput) {
         strcpy(commandLine->command, inputToken);
     }
 
+    // count the number of tokens to be extracted
+    // (the special char "&" is only heeded if in the last token)
+    if (inputToken != NULL) {
+        tokenCount = countSpaces(stringInput);
+
+        // track how many tokens have been parsed
+        ++tokenIndex;
+    }
+
     // try to extract another token in case there are args or options
     inputToken = strtok_r(NULL, delimiter, &indexPointer);
 
     // handle remaining tokens in the command string
     while (inputToken != NULL) {
+        // track how many tokens have been parsed
+        ++tokenIndex;
+
         // parsing logic:
         // if it's token #1, it's a command (already processed)
         // if it's after token #1 and no flag set for "passed a special char", it's an arg
         // if it's a < > special char, flag it
         // if it's after a special char, it's that char's thing; cancel flag
-        // if it's the &, obvious
+        // if it's the & and the last token, run in background is true
 
         // check first character of this token to see if it's a special character
         // if it is a special character, take note that we have passed the args section
@@ -226,7 +263,7 @@ struct CommandLine* parseCommandString(char* stringInput) {
             // next token will be output file name
             isOutFileName = true;
             isSpecialChar = true;
-        } else if (inputToken[0] == backgroundChar) {
+        } else if (inputToken[0] == backgroundChar && tokenIndex == tokenCount) {
             // handle isBackground preference
             commandLine->isBackground = true;
             isSpecialChar = true;
@@ -269,7 +306,6 @@ struct CommandLine* parseCommandString(char* stringInput) {
     // return a pointer to the struct which now has all the parsed data in it
     return commandLine;
 }
-
 
 
 /*
@@ -464,17 +500,26 @@ void ignoreSIGINT(int signalNumber) {
 * signalNumber: used by sigaction() internally
 */
 void handleSIGTSTP(int signalNumber) {
+    char* notice;
+
     if (!GLOBAL_fgOnlyMode) {
         // print a message that foreground-only mode will be turned on
-        char* message = "Entering foreground-only mode (& is now ignored)\n";
-        write(STDOUT_FILENO, message, 49);  // strlen() isn't reentrant
-        fflush(NULL);
+        notice = "Entering foreground-only mode (& is now ignored)\n";
     } else {
         // print a message that foreground-only mode will be turned off
-        char* message = "Exiting foreground-only mode\n";
-        write(STDOUT_FILENO, message, 29);  // strlen() isn't reentrant
-        fflush(NULL);
+        notice = "Exiting foreground-only mode\n";
     }
+
+    // get length of notice
+    int noticeLength = 0;
+    char* checkCharPointer = notice;
+    while (*checkCharPointer != '\0') {
+        ++noticeLength;
+        ++checkCharPointer;
+    }
+
+    write(STDOUT_FILENO, notice, noticeLength);  // strlen() isn't reentrant
+    fflush(NULL);
 
     // toggle foreground-only mode
     GLOBAL_fgOnlyMode = !GLOBAL_fgOnlyMode;
@@ -734,7 +779,6 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
             // This code will only be executed if exec returns to 
             // the original child process because of an error
-            printToTerminal("error in execvp call of child process\n", true);
             exit(EXIT_FAILURE + 1);  // the child process must exit on failure as well
             break;
         
