@@ -791,6 +791,7 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
 
             // This code will only be executed if exec returns to 
             // the original child process because of an error
+            printToTerminal("", true);
             exit(EXIT_FAILURE + 1);  // the child process must exit on failure as well
             break;
         
