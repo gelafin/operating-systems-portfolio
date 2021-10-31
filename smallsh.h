@@ -717,7 +717,7 @@ void handleNewBgChild() {
 */
 void handleThirdPartyCommand(struct CommandLine* commandLine) {
     pid_t spawnPid = -5;
-    int childStatus;
+    int childStatus = 0;
     char* childArgv[MAX_ARG_COUNT];  // must use char*[] for execvp() to work with args
     int copyIndex = 0;  // used by the loop that copies args into childArgv
     char* backgroundNoticePrefix = "background pid is ";
@@ -802,7 +802,13 @@ void handleThirdPartyCommand(struct CommandLine* commandLine) {
                 spawnPid = waitpid(spawnPid, &childStatus, 0);
 
                 // update status
-                GLOBAL_lastForegroundChildStatus = childStatus;
+                if (WIFEXITED(childStatus)) {
+                    // child terminated normally 
+                    GLOBAL_lastForegroundChildStatus = WEXITSTATUS(childStatus);
+                } else {
+                    // child terminated abnormally
+                    GLOBAL_lastForegroundChildStatus = WTERMSIG(childStatus);
+                }
             } else if (!GLOBAL_fgOnlyMode) {
                 // skip the wait and let the child become a zombie process (reaped in outer loop)
 
