@@ -208,6 +208,8 @@ struct CommandLine* parseCommandString(char* stringInput) {
     struct CommandLine* commandLine = malloc(sizeof(struct CommandLine));
     int tokenCount = 0;
     int tokenIndex = 0;
+    char* stringInputCopy = calloc(strlen(stringInput) + 1, sizeof(char));
+    strcpy(stringInputCopy, stringInput);  // enables using the stringInput string alongside strtok_r()
 
     // initialize the CommandLine struct's fixed-size array to all null pointers
     // and initialize its other defaults
@@ -223,7 +225,6 @@ struct CommandLine* parseCommandString(char* stringInput) {
     inputToken = strtok_r(stringInput, delimiter, &indexPointer);
 
     if (inputToken != NULL) {
-        // strcpyDynamic(commandLine->command, inputToken);
         commandLine->command = calloc(strlen(inputToken) + 1, sizeof(char));
         strcpy(commandLine->command, inputToken);
     }
@@ -231,7 +232,10 @@ struct CommandLine* parseCommandString(char* stringInput) {
     // count the number of tokens to be extracted
     // (the special char "&" is only heeded if in the last token)
     if (inputToken != NULL) {
-        tokenCount = countSpaces(stringInput);
+        tokenCount = countSpaces(stringInputCopy);
+
+        // account for the first token before a space
+        ++tokenCount;
 
         // track how many tokens have been parsed
         ++tokenIndex;
@@ -244,6 +248,14 @@ struct CommandLine* parseCommandString(char* stringInput) {
     while (inputToken != NULL) {
         // track how many tokens have been parsed
         ++tokenIndex;
+
+        // determine the char at the last index of this token
+        char* lastCharPointer = stringInputCopy;
+        char lastTokenChar = '\0';
+        while (*lastCharPointer != '\0') {
+            lastTokenChar = *lastCharPointer;
+            ++lastCharPointer;
+        }
 
         // parsing logic:
         // if it's token #1, it's a command (already processed)
@@ -263,7 +275,7 @@ struct CommandLine* parseCommandString(char* stringInput) {
             // next token will be output file name
             isOutFileName = true;
             isSpecialChar = true;
-        } else if (inputToken[0] == backgroundChar && tokenIndex == tokenCount) {
+        } else if (lastTokenChar == backgroundChar && tokenIndex == tokenCount) {
             // handle isBackground preference
             commandLine->isBackground = true;
             isSpecialChar = true;
